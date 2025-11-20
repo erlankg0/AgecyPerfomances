@@ -5,7 +5,7 @@ warnings.filterwarnings('ignore')
 FILE_PATH = "input-data/uyruk/uyruk.xlsx"
 OUTPUT_PATH = "output-data/uyruk_perfomans.xlsx"
 
-print("🚀 Парсинг: Месяц → Страна → Агентство")
+print("🚀 Парсинг: Месяц → Регион → Страна → Агентство")
 
 # ------------------------------
 # 1. Загрузка Excel
@@ -23,7 +23,7 @@ df.columns = (df.columns.astype(str)
               .str.lower())
 
 # ------------------------------
-# 2. Обнаружение месяца
+# 2. Определение месяца
 # ------------------------------
 df['raw'] = df['agencygroup'].astype(str).str.strip()
 month_mask = df['raw'].str.match(r'^\d{2}-', na=False)
@@ -87,7 +87,7 @@ for i in df.index:
     if 'TOTAL' in upper or val == current_country:
         continue
 
-    # Остальное — агентство
+    # Всё остальное — агентство
     if current_country:
         df.at[i, 'Country'] = current_country
         df.at[i, 'Region'] = current_region
@@ -105,8 +105,8 @@ num_cols = [col for col in df_clean.columns if col not in ['raw','agencygroup','
 for col in num_cols:
     df_clean[col] = pd.to_numeric(
         df_clean[col].astype(str)
-        .str.replace('.', '', regex=False)
-        .str.replace(',', '.', regex=False)
+        .str.replace('.', '', regex=False)      # убираем точки тысяч
+        .str.replace(',', '.', regex=False)     # заменяем запятую на точку
         .str.replace(r'[^0-9.-]', '', regex=True),
         errors='coerce'
     ).fillna(0)
