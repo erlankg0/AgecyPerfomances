@@ -35,11 +35,13 @@ df = pd.read_excel(FILE_PATH, header=header_row)
 
 df = df.dropna(how='all').dropna(axis=1, how='all').reset_index(drop=True)
 
-df.columns = (df.columns.astype(str)
-              .str.strip()
-              .str.replace(r'\s+', ' ', regex=True)
-              .str.replace(' ', '_')
-              .str.lower())
+df.columns = (
+    df.columns.astype(str)
+    .str.strip()
+    .str.replace(r'\s+', ' ', regex=True)
+    .str.replace(' ', '_')
+    .str.lower()
+)
 
 # ------------------------------
 # 2. MONTH DETECT
@@ -80,17 +82,17 @@ for i in df.index:
         cur_region  = country_to_region[upper]
         continue
 
-    # 2) Title region match
+    # 2) Region
     if raw_val.title() in region_list_title:
         cur_region = raw_val.title()
         cur_country = None
         continue
 
-    # 3) Skip TOTAL
-    if "TOTAL" in upper:
+    # 3) Skip TOTAL-like rows
+    if "TOTAL" in upper or "USER" in upper or "UTOPIA" in upper:
         continue
 
-    # 4) Fuzzy country
+    # 4) Fuzzy country detection
     cand = difflib.get_close_matches(upper, country_list_upper, n=1, cutoff=0.8)
     if cand:
         upper_match = cand[0]
@@ -105,25 +107,22 @@ for i in df.index:
         df.at[i, 'Region'] = cur_region
 
 # ------------------------------
-# 4. CLEAN
+# 4. CLEAN VALID ONLY
 # ------------------------------
-# ------------------------------
-# 4. CLEAN: оставляем только валидные записи
-# ------------------------------
-
-# Сначала dropna по Agency
 df_clean = df.dropna(subset=['Agency']).copy()
-
-# Фильтруем: оставляем только строки, где Country и Region известны (т.е. есть в эталоне)
 df_clean = df_clean.dropna(subset=['Country', 'Region'])
 
-# Дополнительно можно игнорировать строки, где Agency = 'TOTAL' (если вдруг попало)
-df_clean = df_clean[~df_clean['Agency'].str.upper().str.contains(r'TOTAL|USER|GRAND', na=False)]
+df_clean = df_clean[
+    ~df_clean['Agency'].str.upper().str.contains(r'TOTAL|USER|GRAND', na=False)
+]
 
-
+# ------------------------------
 # NUMERIC FIX
-num_cols = [c for c in df_clean.columns if c not in
-            ['raw','agencygroup','Month','Country','Agency','Region']]
+# ------------------------------
+num_cols = [
+    c for c in df_clean.columns
+    if c not in ['raw', 'agencygroup', 'Month', 'Country', 'Agency', 'Region']
+]
 
 for col in num_cols:
     df_clean[col] = pd.to_numeric(
@@ -135,14 +134,23 @@ for col in num_cols:
     ).fillna(0)
 
 # ------------------------------
-# 5. FINAL ORDER (правильный, как ты требуешь)
+# 4.5 → UPPERCASE all TEXT COLUMNS
+# ------------------------------
+for col in df_clean.select_dtypes(include=['object']).columns:
+    df_clean[col] = df_clean[col].astype(str).str.upper().str.strip()
+
+# ------------------------------
+# 5. FINAL ORDER
 # ------------------------------
 final_cols = ['Month', 'Country', 'Agency', 'Region'] + num_cols
 
 result = df_clean[final_cols].sort_values(
-    ['Month','Country','Agency']
+    ['Month', 'Country', 'Agency']
 ).reset_index(drop=True)
 
+# ------------------------------
+# SAVE
+# ------------------------------
 result.to_excel(OUTPUT_PATH, index=False)
 
 print("\n✅ ГОТОВО! Итог сохранён →", OUTPUT_PATH)
